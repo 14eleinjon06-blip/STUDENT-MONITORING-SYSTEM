@@ -212,6 +212,7 @@ export default function Home() {
         </a>
         <nav className="main-nav" aria-label="Main navigation">
           <button className={activeSection === "students" ? "nav-link active" : "nav-link"} onClick={() => navTo("students")}>Student Information</button>
+          <button className={activeSection === "scan" ? "nav-link active" : "nav-link"} onClick={() => navTo("scan")}>Face / ID Scan</button>
           <button className={activeSection === "record" ? "nav-link active" : "nav-link"} onClick={() => navTo("record")}>Record Attendance</button>
           <button className={activeSection === "reports" ? "nav-link active" : "nav-link"} onClick={() => navTo("reports")}>View Attendance Report</button>
         </nav>
