@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Student Monitoring System</title>
+<style>
+:root{--blue:#2347b8;--blue2:#315be0;--paper:#f3f2ec;--ink:#242424;--line:#b7b7b0}
+*{box-sizing:border-box}body{margin:0;background:#e8ebf2;color:var(--ink);font-family:Arial,Helvetica,sans-serif;min-height:100vh;display:flex;justify-content:center;padding:24px 12px}
+.phone{width:min(100%,390px);min-height:690px;background:var(--paper);border:8px solid #252b3a;border-radius:34px;overflow:hidden;box-shadow:0 18px 50px #18213b30;position:relative}
+.status{height:28px;background:#182f91;color:#fff;text-align:right;padding:6px 15px;font-size:12px}
+.topbar{height:60px;background:var(--blue);color:white;display:flex;align-items:center;justify-content:space-between;padding:0 17px;box-shadow:0 3px 8px #0002}
+.topbar h1{font-size:21px;font-weight:600;margin:0}.menu{font-size:24px;border:0;background:transparent;color:white;cursor:pointer}
+main{padding:12px 12px 24px}.heading{border:1px solid #aaa99f;text-align:center;padding:10px 5px;font-size:13px;font-weight:bold;letter-spacing:.3px;background:#e8e7df;margin-bottom:9px}
+.stats{border:1px solid var(--line);padding:9px 10px;margin-bottom:14px;background:#efeee8;font-size:13px}.stats p{margin:5px 0}.count{font-weight:bold}
+.avatar{height:68px;width:68px;margin:6px auto 12px;border:1px solid #aaa;background:#e5e4dd;display:grid;place-items:center;border-radius:5px;color:#777}
+.avatar svg{width:38px;height:38px}
+.actions{display:flex;flex-direction:column;align-items:center;gap:10px}.actions button,.primary,.secondary{font-size:13px;min-height:42px;padding:10px 16px;border:1px solid #aaa;background:#e5e4dd;box-shadow:0 2px 2px #0001;color:#292929;cursor:pointer;border-radius:2px;min-width:200px}
+button:hover{filter:brightness(.97)}button:focus-visible,input:focus-visible{outline:3px solid #8ba8ff;outline-offset:2px}
+.panel{display:none;border:1px solid var(--line);padding:13px;margin-top:15px;background:#faf9f4}.panel.active{display:block}.panel h2{font-size:17px;margin:0 0 12px}.field{display:flex;flex-direction:column;gap:5px;margin:10px 0;font-size:13px}.field input,.field select{padding:10px;border:1px solid #aaa;background:white;font-size:14px;width:100%}.panel .primary{background:var(--blue);color:white;border-color:var(--blue);width:100%;margin-top:8px}.panel .secondary{width:100%;margin-top:8px}
+.report-row{display:flex;justify-content:space-between;border-bottom:1px solid #ddd;padding:9px 0;font-size:13px}.empty{font-size:13px;color:#666}.foot{text-align:center;color:#777;font-size:11px;padding:18px 0 4px}
+@media(max-width:420px){body{padding:0;background:var(--paper)}.phone{width:100%;border:0;border-radius:0;min-height:100vh;box-shadow:none}.status{height:25px}}
+</style>
+</head>
+<body><div class="phone">
+<div class="status">◆ ◕ ▰ &nbsp; 12:30</div>
+<header class="topbar"><h1>Screen1</h1><button class="menu" id="menuBtn" aria-label="Show menu">⋮</button></header>
+<main>
+<div class="heading">STUDENT MONITORING SYSTEM</div>
+<section class="stats" aria-live="polite"><p>TOTAL STUDENTS: <span class="count" id="total">0</span></p><p>PRESENT: <span class="count" id="present">0</span></p><p>ABSENT: <span class="count" id="absent">0</span></p></section>
+<div class="avatar" aria-label="Student image placeholder"><svg viewBox="0 0 40 40" fill="currentColor" aria-hidden="true"><rect x="2" y="2" width="36" height="36" rx="3"/><circle cx="27" cy="13" r="4" fill="#e5e4dd"/><path d="M5 32 15 20l6 7 5-5 9 10Z" fill="#e5e4dd"/></svg></div>
+<div class="actions">
+<button data-panel="studentPanel">STUDENT INFORMATION</button>
+<button data-panel="attendancePanel">RECORD ATTENDANCE</button>
+<button data-panel="reportPanel">VIEW ATTENDANCE REPORT</button>
+</div>
+<section class="panel" id="studentPanel"><h2>Student Information</h2>
+<form id="studentForm"><label class="field">Student ID<input id="studentId" required placeholder="e.g. 2026-001"></label><label class="field">Full Name<input id="studentName" required placeholder="Enter student's full name"></label><label class="field">Course / Section<input id="studentSection" placeholder="e.g. BSIT-3A"></label><button class="primary" type="submit">ADD STUDENT</button></form>
+<div id="studentList"></div></section>
+<section class="panel" id="attendancePanel"><h2>Record Attendance</h2><label class="field">Select Student<select id="attendanceStudent" required><option value="">Add a student first</option></select></label><label class="field">Attendance Status<select id="attendanceStatus"><option>Present</option><option>Absent</option></select></label><label class="field">Date<input type="date" id="attendanceDate" required></label><button class="primary" id="saveAttendance">SAVE ATTENDANCE</button></section>
+<section class="panel" id="reportPanel"><h2>Attendance Report</h2><label class="field">Filter by date<input type="date" id="reportDate"></label><div id="reportRows"><p class="empty">No attendance records yet.</p></div><button class="secondary" id="clearFilter">SHOW ALL RECORDS</button></section>
+<div class="foot">Student Monitoring System · Demo project</div>
+</main></div>
+<script>
+const $=id=>document.getElementById(id);
+let students=[],records=[];
+try{students=JSON.parse(localStorage.getItem('sms_students')||'[]');records=JSON.parse(localStorage.getItem('sms_records')||'[]')}catch(e){students=[];records=[]}
+const today=()=>new Date().toISOString().slice(0,10);$('attendanceDate').value=today();$('reportDate').value=today();
+function persist(){localStorage.setItem('sms_students',JSON.stringify(students));localStorage.setItem('sms_records',JSON.stringify(records));render()}
+function render(){
+$('total').textContent=students.length;
+const todays=records.filter(r=>r.date===today());$('present').textContent=todays.filter(r=>r.status==='Present').length;$('absent').textContent=todays.filter(r=>r.status==='Absent').length;
+$('attendanceStudent').innerHTML=students.length?'<option value="">Choose a student</option>'+students.map(s=>'<option value="'+escapeHtml(s.id)+'">'+escapeHtml(s.name)+' ('+escapeHtml(s.id)+')</option>').join(''):'<option value="">Add a student first</option>';
+$('studentList').innerHTML=students.length?'<h2 style="margin-top:18px">Registered Students</h2>'+students.map(s=>'<div class="report-row"><span>'+escapeHtml(s.name)+'<br><small>'+escapeHtml(s.id)+' · '+escapeHtml(s.section||'No section')+'</small></span><button type="button" data-delete="'+escapeHtml(s.id)+'" style="min-width:auto;padding:4px 8px">Remove</button></div>').join(''):'<p class="empty">No students added yet.</p>';
+const date=$('reportDate').value;const filtered=records.filter(r=>!date||r.date===date).slice().reverse();
+$('reportRows').innerHTML=filtered.length?filtered.map(r=>{const s=students.find(s=>s.id===r.studentId);return '<div class="report-row"><span><strong>'+escapeHtml(s?s.name:r.studentId)+'</strong><br><small>'+escapeHtml(r.date)+'</small></span><span>'+escapeHtml(r.status)+'</span></div>'}).join(''):'<p class="empty">No attendance records for this date.</p>';
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+document.querySelectorAll('[data-panel]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));$(b.dataset.panel).classList.add('active');$(b.dataset.panel).scrollIntoView({behavior:'smooth',block:'nearest'})}));
+$('studentForm').addEventListener('submit',e=>{e.preventDefault();const id=$('studentId').value.trim();if(students.some(s=>s.id.toLowerCase()===id.toLowerCase())){alert('That student ID already exists.');return}students.push({id,name:$('studentName').value.trim(),section:$('studentSection').value.trim()});e.target.reset();persist()});
+$('studentList').addEventListener('click',e=>{const id=e.target.dataset.delete;if(!id)return;if(confirm('Remove this student and their attendance records?')){students=students.filter(s=>s.id!==id);records=records.filter(r=>r.studentId!==id);persist()}});
+$('saveAttendance').addEventListener('click',()=>{const studentId=$('attendanceStudent').value,date=$('attendanceDate').value,status=$('attendanceStatus').value;if(!studentId){alert('Please add and select a student first.');return}if(!date){alert('Please select a date.');return}const old=records.findIndex(r=>r.studentId===studentId&&r.date===date);const record={studentId,date,status};if(old>=0)records[old]=record;else records.push(record);persist();alert('Attendance saved!')});
+$('reportDate').addEventListener('change',render);$('clearFilter').addEventListener('click',()=>{$('reportDate').value='';render()});$('menuBtn').addEventListener('click',()=>alert('Student Monitoring System\nUse the three buttons to manage students and attendance.'));
+render();
+</script></body></html>
