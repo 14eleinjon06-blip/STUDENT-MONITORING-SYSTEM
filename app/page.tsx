@@ -81,12 +81,22 @@ export default function Home() {
     async function startCamera() {
       try {
         setCameraError("");
+        if (!navigator.mediaDevices?.getUserMedia) {
+          setCameraError("This browser cannot open the camera. Use an updated browser over HTTPS, or use Student ID Scan instead.");
+          return;
+        }
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-        if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return; }
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         streamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
-      } catch {
-        setCameraError("Camera access was blocked or is unavailable. Allow camera permission and try again.");
+      } catch (error) {
+        const cameraMessage = error instanceof Error && error.name === "NotAllowedError"
+          ? "Camera permission was denied. Allow camera access in your browser settings and try again."
+          : "The camera is unavailable or already in use. Check your camera and try again, or use Student ID Scan.";
+        setCameraError(cameraMessage);
       }
     }
     startCamera();
