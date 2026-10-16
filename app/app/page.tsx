@@ -1,265 +1,278 @@
-
 "use client";
 
-import { useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
+type AttendanceStatus = "Present" | "Absent";
 type Student = {
   id: number;
   name: string;
+  studentNo: string;
   course: string;
   year: string;
-  status: "Present" | "Absent" | "Late";
+  photo: string;
+};
+type AttendanceRecord = {
+  id: number;
+  studentId: number;
+  studentName: string;
+  date: string;
+  status: AttendanceStatus;
 };
 
-const initialStudents: Student[] = [
-  { id: 1, name: "Alex Santos", course: "BSIT", year: "3rd Year", status: "Present" },
-  { id: 2, name: "Maria Reyes", course: "BSIT", year: "2nd Year", status: "Late" },
-  { id: 3, name: "John Cruz", course: "BSCS", year: "1st Year", status: "Absent" },
-  { id: 4, name: "Angela Garcia", course: "BSIT", year: "4th Year", status: "Present" },
-  { id: 5, name: "Mark Dela Cruz", course: "BSCS", year: "3rd Year", status: "Present" },
-];
+const STUDENTS_KEY = "student-monitoring-students-v2";
+const ATTENDANCE_KEY = "student-monitoring-attendance-v2";
+
+function todayString() {
+  const now = new Date();
+  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+}
 
 export default function Home() {
-  const [students, setStudents] = useState(initialStudents);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [ready, setReady] = useState(false);
+  const [activeSection, setActiveSection] = useState("students");
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("All");
-  const [showForm, setShowForm] = useState(false);
+  const [reportDate, setReportDate] = useState(todayString());
+  const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState("");
+  const [studentNo, setStudentNo] = useState("");
   const [course, setCourse] = useState("BSIT");
   const [year, setYear] = useState("1st Year");
+  const [photo, setPhoto] = useState("");
   const [notice, setNotice] = useState("");
 
-  const today = new Date().toLocaleDateString("en-PH", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  useEffect(() => {
+    try {
+      const savedStudents = localStorage.getItem(STUDENTS_KEY);
+      const savedAttendance = localStorage.getItem(ATTENDANCE_KEY);
+      if (savedStudents) setStudents(JSON.parse(savedStudents));
+      if (savedAttendance) setAttendance(JSON.parse(savedAttendance));
+    } catch {
+      setNotice("Saved data could not be loaded. You can still add student records.");
+    }
+    setReady(true);
+  }, []);
 
-  const counts = {
-    total: students.length,
-    present: students.filter((s) => s.status === "Present").length,
-    absent: students.filter((s) => s.status === "Absent").length,
-    late: students.filter((s) => s.status === "Late").length,
-  };
+  useEffect(() => {
+    if (!ready) return;
+    localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+  }, [students, ready]);
 
-  const filteredStudents = useMemo(
-    () =>
-      students.filter((student) => {
-        const matchesSearch =
-          student.name.toLowerCase().includes(search.toLowerCase()) ||
-          student.course.toLowerCase().includes(search.toLowerCase());
-        const matchesStatus = filter === "All" || student.status === filter;
-        return matchesSearch && matchesStatus;
-      }),
-    [students, search, filter]
-  );
+  useEffect(() => {
+    if (!ready) return;
+    localStorage.setItem(ATTENDANCE_KEY, JSON.stringify(attendance));
+  }, [attendance, ready]);
 
-  function updateStatus(id: number, status: Student["status"]) {
-    setStudents((current) =>
-      current.map((student) =>
-        student.id === id ? { ...student, status } : student
-      )
+  const today = todayString();
+  const todayRecords = attendance.filter((record) => record.date === today);
+  const presentCount = todayRecords.filter((record) => record.status === "Present").length;
+  const absentCount = todayRecords.filter((record) => record.status === "Absent").length;
+
+  const filteredStudents = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return students.filter((student) =>
+      [student.name, student.studentNo, student.course, student.year].some((value) => value.toLowerCase().includes(query))
     );
-    setNotice("Attendance status updated.");
+  }, [students, search]);
+
+  const reportRecords = attendance
+    .filter((record) => record.date === reportDate)
+    .sort((a, b) => a.studentName.localeCompare(b.studentName));
+
+  function handlePhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setNotice("Please select an image file for the student picture.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setNotice("Please choose a picture smaller than 2 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setPhoto(String(reader.result || ""));
+    reader.readAsDataURL(file);
   }
 
-  function addStudent(event: React.FormEvent<HTMLFormElement>) {
+  function addStudent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim()) return;
-
-    setStudents((current) => [
-      ...current,
-      {
-        id: Math.max(0, ...current.map((s) => s.id)) + 1,
-        name: name.trim(),
-        course,
-        year,
-        status: "Absent",
-      },
-    ]);
+    if (students.some((student) => student.studentNo && student.studentNo.toLowerCase() === studentNo.trim().toLowerCase())) {
+      setNotice("That student number is already registered.");
+      return;
+    }
+    const student: Student = {
+      id: Date.now(),
+      name: name.trim(),
+      studentNo: studentNo.trim(),
+      course,
+      year,
+      photo,
+    };
+    setStudents((current) => [...current, student]);
     setName("");
+    setStudentNo("");
     setCourse("BSIT");
     setYear("1st Year");
-    setShowForm(false);
-    setNotice("Student added successfully.");
+    setPhoto("");
+    setFormOpen(false);
+    setNotice("Student information saved.");
+  }
+
+  function markAttendance(student: Student, status: AttendanceStatus) {
+    setAttendance((current) => {
+      const existing = current.find((record) => record.studentId === student.id && record.date === today);
+      if (existing) {
+        return current.map((record) =>
+          record.id === existing.id ? { ...record, status, studentName: student.name } : record
+        );
+      }
+      return [...current, {
+        id: Date.now() + student.id,
+        studentId: student.id,
+        studentName: student.name,
+        date: today,
+        status,
+      }];
+    });
+    setNotice(student.name + " marked " + status.toLowerCase() + " for today.");
+  }
+
+  function deleteStudent(student: Student) {
+    if (!window.confirm("Delete " + student.name + " and their attendance records?")) return;
+    setStudents((current) => current.filter((item) => item.id !== student.id));
+    setAttendance((current) => current.filter((item) => item.studentId !== student.id));
+    setNotice("Student record deleted.");
+  }
+
+  function navTo(section: string) {
+    setActiveSection(section);
+    document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   return (
     <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-icon">SM</div>
+      <header className="site-header">
+        <a className="brand" href="#top" onClick={() => setActiveSection("students")} aria-label="Student Monitoring System home">
+          <span className="brand-mark">SM</span>
+          <span className="brand-name">Student Monitoring System<small>STUDENT RECORDS & ATTENDANCE</small></span>
+        </a>
+        <nav className="main-nav" aria-label="Main navigation">
+          <button className={activeSection === "students" ? "nav-link active" : "nav-link"} onClick={() => navTo("students")}>Student Information</button>
+          <button className={activeSection === "record" ? "nav-link active" : "nav-link"} onClick={() => navTo("record")}>Record Attendance</button>
+          <button className={activeSection === "reports" ? "nav-link active" : "nav-link"} onClick={() => navTo("reports")}>View Attendance Report</button>
+        </nav>
+      </header>
+
+      <div className="page-content" id="top">
+        <section className="intro">
           <div>
-            <strong>StudentTrack</strong>
-            <span>Monitoring System</span>
+            <p className="eyebrow">STUDENT OVERVIEW</p>
+            <h1>Student Monitoring System</h1>
+            <p className="intro-text">Manage student profiles, record daily attendance, and review attendance reports in one place.</p>
           </div>
-        </div>
-
-        <p className="nav-label">MENU</p>
-        <a className="nav-item active" href="#dashboard">▦ <span>Dashboard</span></a>
-        <a className="nav-item" href="#students">♙ <span>Students</span></a>
-        <a className="nav-item" href="#attendance">✓ <span>Attendance</span></a>
-
-        <div className="sidebar-bottom">
-          <div className="profile-avatar">AD</div>
-          <div className="profile-info">
-            <strong>Administrator</strong>
-            <span>School Admin</span>
-          </div>
-        </div>
-      </aside>
-
-      <section className="main-area" id="dashboard">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">SCHOOL MANAGEMENT</p>
-            <h1>Student Dashboard</h1>
-            <p className="subtitle">Monitor student records and daily attendance.</p>
-          </div>
-          <div className="date-chip">▦ {today}</div>
-        </header>
-
-        <section className="welcome-panel">
-          <div>
-            <p className="welcome-small">WELCOME BACK!</p>
-            <h2>Keep your students on track.</h2>
-            <p>View student information and manage attendance in one place.</p>
-          </div>
-          <div className="welcome-symbol">▤</div>
+          <div className="date-pill"><span className="date-dot" /> {new Date().toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}</div>
         </section>
 
-        <section className="stats-grid" aria-label="Attendance summary">
-          <article className="stat-card">
-            <div className="stat-top"><span>Total Students</span><span className="stat-icon blue">♙</span></div>
-            <strong>{counts.total}</strong>
-            <small>Registered students</small>
+        {notice && <div className="notice" role="status"><span>✓</span>{notice}<button onClick={() => setNotice("")} aria-label="Dismiss message">×</button></div>}
+
+        <section className="stats-grid" aria-label="Student attendance summary">
+          <article className="stat-card total-card">
+            <div className="stat-label"><span className="stat-symbol">♙</span>Total Student</div>
+            <strong>{students.length}</strong>
+            <p>Registered student records</p>
           </article>
-          <article className="stat-card">
-            <div className="stat-top"><span>Present</span><span className="stat-icon green">✓</span></div>
-            <strong>{counts.present}</strong>
-            <small>Marked present today</small>
+          <article className="stat-card present-card">
+            <div className="stat-label"><span className="stat-symbol">✓</span>Present</div>
+            <strong>{presentCount}</strong>
+            <p>Marked present today</p>
           </article>
-          <article className="stat-card">
-            <div className="stat-top"><span>Absent</span><span className="stat-icon red">×</span></div>
-            <strong>{counts.absent}</strong>
-            <small>Marked absent today</small>
-          </article>
-          <article className="stat-card">
-            <div className="stat-top"><span>Late</span><span className="stat-icon orange">◷</span></div>
-            <strong>{counts.late}</strong>
-            <small>Arrived late today</small>
+          <article className="stat-card absent-card">
+            <div className="stat-label"><span className="stat-symbol">×</span>Absent</div>
+            <strong>{absentCount}</strong>
+            <p>Marked absent today</p>
           </article>
         </section>
 
-        <section className="student-panel" id="students">
-          <div className="panel-heading">
-            <div>
-              <h2>Student Records</h2>
-              <p>Search students and update their attendance status.</p>
-            </div>
-            <button className="primary-button" onClick={() => setShowForm(!showForm)}>
-              + Add Student
+        <section className="content-panel" id="students">
+          <div className="section-heading">
+            <div><p className="eyebrow">STUDENT DIRECTORY</p><h2>Student Information</h2><p>Student pictures and basic information appear here after you add a student.</p></div>
+            <button className="primary-button" onClick={() => { setFormOpen((open) => !open); setActiveSection("students"); }}>
+              <span>{formOpen ? "−" : "+"}</span> {formOpen ? "Close Form" : "Add Student"}
             </button>
           </div>
 
-          {notice && <p className="notice" role="status">{notice}</p>}
+          {formOpen && <form className="student-form" onSubmit={addStudent}>
+            <div className="photo-upload">
+              {photo ? <img src={photo} alt="Student preview" className="photo-preview" /> : <div className="photo-placeholder">＋<small>Student photo</small></div>}
+              <label className="upload-button">Upload picture<input type="file" accept="image/*" onChange={handlePhoto} /></label>
+              <small>Image file, max 2 MB</small>
+            </div>
+            <div className="form-fields">
+              <label>Full name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Enter student full name" required /></label>
+              <label>Student number<input value={studentNo} onChange={(event) => setStudentNo(event.target.value)} placeholder="Enter student number" /></label>
+              <label>Course / Program<select value={course} onChange={(event) => setCourse(event.target.value)}><option>BSIT</option><option>BSCS</option><option>BSIS</option><option>BSEd</option><option>BEEd</option><option>Other</option></select></label>
+              <label>Year level<select value={year} onChange={(event) => setYear(event.target.value)}><option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option><option>5th Year</option></select></label>
+              <button type="submit" className="primary-button save-button">Save Student Information</button>
+            </div>
+          </form>}
 
-          {showForm && (
-            <form className="student-form" onSubmit={addStudent}>
-              <label>
-                Student name
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter full name" required />
-              </label>
-              <label>
-                Course
-                <select value={course} onChange={(e) => setCourse(e.target.value)}>
-                  <option>BSIT</option>
-                  <option>BSCS</option>
-                  <option>BSIS</option>
-                  <option>BSEd</option>
-                </select>
-              </label>
-              <label>
-                Year level
-                <select value={year} onChange={(e) => setYear(e.target.value)}>
-                  <option>1st Year</option>
-                  <option>2nd Year</option>
-                  <option>3rd Year</option>
-                  <option>4th Year</option>
-                </select>
-              </label>
-              <button className="primary-button" type="submit">Save Student</button>
-            </form>
-          )}
-
-          <div className="toolbar" id="attendance">
-            <input
-              className="search-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="⌕  Search by student or course..."
-              aria-label="Search students"
-            />
-            <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter attendance">
-              <option>All</option>
-              <option>Present</option>
-              <option>Absent</option>
-              <option>Late</option>
-            </select>
+          <div className="list-toolbar">
+            <label className="search-box"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search student name, number, or course..." aria-label="Search students" /></label>
+            <span className="record-count">{filteredStudents.length} student{filteredStudents.length === 1 ? "" : "s"}</span>
           </div>
 
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>STUDENT</th>
-                  <th>COURSE</th>
-                  <th>YEAR LEVEL</th>
-                  <th>ATTENDANCE</th>
-                  <th>UPDATE STATUS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStudents.map((student) => (
-                  <tr key={student.id}>
-                    <td>
-                      <div className="student-name">
-                        <span className="student-avatar">{student.name.charAt(0).toUpperCase()}</span>
-                        <strong>{student.name}</strong>
-                      </div>
-                    </td>
-                    <td>{student.course}</td>
-                    <td>{student.year}</td>
-                    <td><span className={`status ${student.status.toLowerCase()}`}>{student.status}</span></td>
-                    <td>
-                      <select
-                        className="status-select"
-                        value={student.status}
-                        onChange={(e) => updateStatus(student.id, e.target.value as Student["status"])}
-                        aria-label={`Update attendance for ${student.name}`}
-                      >
-                        <option>Present</option>
-                        <option>Absent</option>
-                        <option>Late</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-                {filteredStudents.length === 0 && (
-                  <tr><td colSpan={5} className="empty-state">No students found. Try another search.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <p className="table-footer">Showing {filteredStudents.length} of {students.length} students</p>
+          {filteredStudents.length === 0 ? <div className="empty-state">
+            <div className="empty-icon">♙</div><h3>{students.length === 0 ? "No students added yet" : "No matching students"}</h3>
+            <p>{students.length === 0 ? "Select “Add Student” to create a profile and upload a student picture." : "Try another search term."}</p>
+            {students.length === 0 && <button className="secondary-button" onClick={() => setFormOpen(true)}>＋ Add your first student</button>}
+          </div> : <div className="student-grid">
+            {filteredStudents.map((student) => <article className="student-card" key={student.id}>
+              {student.photo ? <img src={student.photo} alt={student.name} className="student-photo" /> : <div className="student-photo photo-initial">{student.name.charAt(0).toUpperCase()}</div>}
+              <div className="student-details"><h3>{student.name}</h3><p>{student.studentNo || "No student number"}</p><div className="student-tags"><span>{student.course}</span><span>{student.year}</span></div></div>
+              <button className="delete-button" onClick={() => deleteStudent(student)} aria-label={"Delete " + student.name} title="Delete student">×</button>
+            </article>)}
+          </div>}
         </section>
 
-        <footer className="footer">
-          <span>StudentTrack · Student Monitoring System</span>
-          <span>Dashboard demo · {new Date().getFullYear()}</span>
-        </footer>
-      </section>
+        <section className="content-panel" id="record">
+          <div className="section-heading">
+            <div><p className="eyebrow">DAILY CLASS RECORD</p><h2>Record Attendance</h2><p>Choose Present or Absent for each student. You can update the status anytime today.</p></div>
+            <span className="today-badge">{new Date().toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</span>
+          </div>
+          {students.length === 0 ? <div className="compact-empty">Add student information first before recording attendance.</div> : <div className="attendance-list">
+            {students.map((student) => {
+              const record = todayRecords.find((item) => item.studentId === student.id);
+              return <div className="attendance-row" key={student.id}>
+                {student.photo ? <img src={student.photo} alt="" className="mini-photo" /> : <div className="mini-photo mini-initial">{student.name.charAt(0).toUpperCase()}</div>}
+                <div className="attendance-person"><strong>{student.name}</strong><span>{student.studentNo || student.course + " · " + student.year}</span></div>
+                <span className={record ? "attendance-status " + record.status.toLowerCase() : "attendance-status unmarked"}>{record?.status || "Not marked"}</span>
+                <div className="attendance-actions"><button className={record?.status === "Present" ? "mark-button present selected" : "mark-button present"} onClick={() => markAttendance(student, "Present")}>✓ Present</button><button className={record?.status === "Absent" ? "mark-button absent selected" : "mark-button absent"} onClick={() => markAttendance(student, "Absent")}>× Absent</button></div>
+              </div>;
+            })}
+          </div>}
+        </section>
+
+        <section className="content-panel" id="reports">
+          <div className="section-heading report-heading">
+            <div><p className="eyebrow">ATTENDANCE HISTORY</p><h2>View Attendance Report</h2><p>Choose a date to see attendance records saved for that day.</p></div>
+            <label className="date-field">Report date<input type="date" value={reportDate} onChange={(event) => setReportDate(event.target.value)} /></label>
+          </div>
+          <div className="report-summary">
+            <div><span>Records for selected date</span><strong>{reportRecords.length}</strong></div>
+            <div><span>Present</span><strong className="report-present">{reportRecords.filter((item) => item.status === "Present").length}</strong></div>
+            <div><span>Absent</span><strong className="report-absent">{reportRecords.filter((item) => item.status === "Absent").length}</strong></div>
+          </div>
+          {reportRecords.length === 0 ? <div className="compact-empty">No attendance records for this date yet.</div> : <div className="report-table-wrap"><table className="report-table"><thead><tr><th>STUDENT</th><th>DATE</th><th>ATTENDANCE</th></tr></thead><tbody>{reportRecords.map((record) => {
+            const student = students.find((item) => item.id === record.studentId);
+            return <tr key={record.id}><td><div className="report-student">{student?.photo ? <img src={student.photo} alt="" /> : <span className="report-initial">{record.studentName.charAt(0).toUpperCase()}</span>}<strong>{record.studentName}</strong></div></td><td>{record.date}</td><td><span className={"attendance-status " + record.status.toLowerCase()}>{record.status}</span></td></tr>;
+          })}</tbody></table></div>}
+        </section>
+
+        <footer className="page-footer"><span>Student Monitoring System</span><span>Student information · Attendance · Reports</span></footer>
+      </div>
     </main>
   );
-          }
-
+}
