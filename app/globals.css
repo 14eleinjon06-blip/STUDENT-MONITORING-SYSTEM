@@ -329,3 +329,37 @@ h1 { letter-spacing: -1.55px; }
   .section-heading { padding: 21px 16px; }
   .nav-link { border-radius: 9px; }
 }
+
+
+/* Face and student ID scanner */
+.scanner-panel { padding: 20px 24px 24px; }
+.scanner-tabs { display: flex; gap: 8px; padding-bottom: 18px; border-bottom: 1px solid #f0edf7; }
+.scanner-tab { padding: 11px 16px; border: 1px solid #e8e4f4; border-radius: 10px; background: #fff; color: #77718f; font-size: 12px; font-weight: 800; }
+.scanner-tab.active { border-color: #d8cdfd; background: #f0eaff; color: #5b3bc3; }
+.scanner-content { display: flex; align-items: flex-start; flex-direction: column; gap: 15px; padding: 23px 0 0; }
+.scanner-icon { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 15px; background: #f0eaff; color: #7655df; font-size: 28px; }
+.scanner-copy h3 { margin: 0; font-family: Manrope, sans-serif; font-size: 16px; }
+.scanner-copy p, .scanner-note { max-width: 700px; margin: 7px 0 0; color: #77718f; font-size: 12px; line-height: 1.7; }
+.scan-form { width: 100%; max-width: 760px; display: grid; gap: 8px; margin-top: 2px; }
+.scan-form > label { color: #555873; font-size: 11px; font-weight: 800; }
+.scan-input-row { display: flex; gap: 9px; width: 100%; }
+.scan-input-row input, .scan-input-row select { flex: 1; min-width: 0; min-height: 43px; padding: 10px 12px; border: 1px solid #e5e4ef; border-radius: 10px; background: white; color: #30314b; font: inherit; font-size: 12px; }
+.scanner-note { font-size: 10px; }
+.face-scan-content { align-items: flex-start; }
+.camera-frame { position: relative; display: grid; place-items: center; width: min(100%, 520px); min-height: 260px; overflow: hidden; border: 1px solid #e1daf8; border-radius: 16px; background: #201b36; }
+.camera-frame video { display: block; width: 100%; max-height: 390px; object-fit: cover; transform: scaleX(-1); }
+.camera-placeholder { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; min-height: 260px; color: white; text-align: center; }
+.camera-placeholder > span { font-size: 38px; color: #b5a4ff; }
+.camera-placeholder strong { font-size: 14px; }
+.camera-placeholder small { color: #c9c3dc; font-size: 11px; }
+.face-guide { position: absolute; top: 50%; left: 50%; width: 145px; height: 185px; border: 2px solid rgba(191, 175, 255, .95); border-radius: 48% 48% 43% 43%; box-shadow: 0 0 0 999px rgba(25, 18, 51, .13); transform: translate(-50%, -50%); pointer-events: none; }
+.camera-error { margin: 0; color: #bd4654; font-size: 12px; }
+@media (max-width: 600px) {
+  .scanner-panel { padding: 15px; }
+  .scanner-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+  .scanner-tab { padding: 10px 7px; font-size: 10px; }
+  .scan-input-row { flex-direction: column; }
+  .scan-input-row .primary-button { width: 100%; }
+  .camera-frame { min-height: 220px; }
+  .camera-placeholder { min-height: 220px; }
+}
