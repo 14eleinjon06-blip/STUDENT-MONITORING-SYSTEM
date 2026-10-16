@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type AttendanceStatus = "Present" | "Absent";
 type Student = {
@@ -41,6 +41,13 @@ export default function Home() {
   const [year, setYear] = useState("1st Year");
   const [photo, setPhoto] = useState("");
   const [notice, setNotice] = useState("");
+  const [scanMode, setScanMode] = useState<"face" | "id">("id");
+  const [scanValue, setScanValue] = useState("");
+  const [scanStudentId, setScanStudentId] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     try {
@@ -63,6 +70,32 @@ export default function Home() {
     if (!ready) return;
     localStorage.setItem(ATTENDANCE_KEY, JSON.stringify(attendance));
   }, [attendance, ready]);
+
+  useEffect(() => {
+    if (!cameraOpen) {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    async function startCamera() {
+      try {
+        setCameraError("");
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+        if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      } catch {
+        setCameraError("Camera access was blocked or is unavailable. Allow camera permission and try again.");
+      }
+    }
+    startCamera();
+    return () => {
+      cancelled = true;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, [cameraOpen]);
 
   const today = todayString();
   const todayRecords = attendance.filter((record) => record.date === today);
@@ -138,6 +171,24 @@ export default function Home() {
       }];
     });
     setNotice(student.name + " marked " + status.toLowerCase() + " for today.");
+  }
+
+  function submitScan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = scanValue.trim().toLowerCase();
+    if (!query) { setNotice("Enter or scan a student ID first."); return; }
+    const student = students.find((item) => item.studentNo.trim().toLowerCase() === query);
+    if (!student) { setNotice("Student ID not found. Register the student first or check the ID number."); return; }
+    markAttendance(student, "Present");
+    setScanValue("");
+  }
+
+  function confirmFaceMatch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const student = students.find((item) => String(item.id) === scanStudentId);
+    if (!student) { setNotice("Select the registered student that matches the person in the camera."); return; }
+    markAttendance(student, "Present");
+    setScanStudentId("");
   }
 
   function deleteStudent(student: Student) {
@@ -235,6 +286,40 @@ export default function Home() {
               <button className="delete-button" onClick={() => deleteStudent(student)} aria-label={"Delete " + student.name} title="Delete student">×</button>
             </article>)}
           </div>}
+        </section>
+
+        <section className="content-panel" id="scan">
+          <div className="section-heading">
+            <div><p className="eyebrow">QUICK VERIFICATION</p><h2>Face Scan & Student ID Scan</h2><p>Verify a registered student and mark them present for today.</p></div>
+            <span className="today-badge">Attendance scanner</span>
+          </div>
+          <div className="scanner-panel">
+            <div className="scanner-tabs" role="tablist" aria-label="Scan method">
+              <button type="button" className={scanMode === "face" ? "scanner-tab active" : "scanner-tab"} onClick={() => { setScanMode("face"); setCameraOpen(false); }}>◉ Face Scan</button>
+              <button type="button" className={scanMode === "id" ? "scanner-tab active" : "scanner-tab"} onClick={() => { setScanMode("id"); setCameraOpen(false); }}>▤ Student ID Scan</button>
+            </div>
+            {scanMode === "id" ? <div className="scanner-content">
+              <div className="scanner-icon">▤</div>
+              <div className="scanner-copy"><h3>Scan or enter student ID</h3><p>Use a USB barcode/QR scanner that types into the field, or enter the student number printed on the ID card.</p></div>
+              <form className="scan-form" onSubmit={submitScan}>
+                <label htmlFor="scan-student-id">Student ID number</label>
+                <div className="scan-input-row"><input id="scan-student-id" value={scanValue} onChange={(event) => setScanValue(event.target.value)} placeholder="Scan or type student ID" autoComplete="off" required /><button type="submit" className="primary-button">Verify & Check In</button></div>
+              </form>
+              <p className="scanner-note">The ID must match a student number already saved in Student Information.</p>
+            </div> : <div className="scanner-content face-scan-content">
+              <div className="camera-frame">
+                {cameraOpen ? <video ref={videoRef} autoPlay playsInline muted aria-label="Live face scan camera" /> : <div className="camera-placeholder"><span>◉</span><strong>Camera preview</strong><small>Allow camera access to begin</small></div>}
+                {cameraOpen && <div className="face-guide" aria-hidden="true" />}
+              </div>
+              {cameraError && <p className="camera-error" role="alert">{cameraError}</p>}
+              <div className="scanner-copy"><h3>Face scan assistance</h3><p>Open the camera, then select the registered student whose face you have verified. This version does not automatically identify faces; it records attendance only after you confirm the match.</p></div>
+              {!cameraOpen ? <button type="button" className="primary-button" onClick={() => setCameraOpen(true)}>Open Camera</button> : <button type="button" className="secondary-button" onClick={() => setCameraOpen(false)}>Stop Camera</button>}
+              <form className="scan-form" onSubmit={confirmFaceMatch}>
+                <label htmlFor="face-student-match">Confirm registered student</label>
+                <div className="scan-input-row"><select id="face-student-match" value={scanStudentId} onChange={(event) => setScanStudentId(event.target.value)} required><option value="">Select matching student</option>{students.map((student) => <option key={student.id} value={String(student.id)}>{student.name} — {student.studentNo || "No ID"}</option>)}</select><button type="submit" className="primary-button">Confirm & Check In</button></div>
+              </form>
+            </div>}
+          </div>
         </section>
 
         <section className="content-panel" id="record">
