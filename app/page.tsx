@@ -61,7 +61,7 @@ export default function Home() {
   return (
     <main className="phone">
       <div className="status-bar"><span className="clock">12:30</span><span aria-hidden="true">◆ ◕ ▰</span></div>
-      <header className="app-bar"><h1>Screen1</h1><button className="menu-button" aria-label="About" onClick={() => setPanel(null)}>⋮</button></header>
+      <header className="app-bar"><h1>Student Monitoring System</h1><button className="menu-button" aria-label="About" onClick={() => setPanel(null)}>⋮</button></header>
       <div className="screen-content">
         <div className="screen-heading">STUDENT MONITORING SYSTEM</div>
         <section className="summary" aria-live="polite">
